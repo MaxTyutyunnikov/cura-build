@@ -6,14 +6,20 @@
 set -e
 
 # Get where this script resides
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-ROOT_DIR="${SCRIPT_DIR}/../.."
+SCRIPT_DIR="$( cd $( dirname "${BASH_SOURCE[0]}" ) >/dev/null 2>&1 && pwd )"
+ROOT_DIR="${SCRIPT_DIR}/.."
 
 # Make sure that cura-build-environment is present
 if [[ -z "${CURA_BUILD_ENV_PATH}" ]]; then
     echo "CURA_BUILD_ENV_PATH is not defined. Cannot find the installed cura build environment."
     exit 1
 fi
+
+export PATH="${CURA_BUILD_ENV_PATH}/bin:${PATH}"
+export PKG_CONFIG_PATH="${CURA_BUILD_ENV_PATH}/lib/pkgconfig:${PKG_CONFIG_PATH}"
+export CMAKE_INSTALL_PREFIX=${CURA_BUILD_ENV_PATH}
+export LD_LIBRARY_PATH=${CMAKE_INSTALL_PREFIX}/lib/
+export PYTHONPATH=${CMAKE_INSTALL_PREFIX}/lib/python3/dist-packages/:${CMAKE_INSTALL_PREFIX}/lib/python3.5:${CMAKE_INSTALL_PREFIX}/lib/python3.5/site-packages/
 
 # Make sure that a directory for saving the resulting AppImage exists
 CURA_APPIMAGES_OUTPUT_DIR="${CURA_APPIMAGES_OUTPUT_DIR:-/home/ultimaker/appimages}"
@@ -22,27 +28,15 @@ if [[ ! -d "${CURA_APPIMAGES_OUTPUT_DIR}" ]]; then
 fi
 
 # Set up Cura build configuration in environment variables
-export CURA_BRANCH_OR_TAG="${CURA_BRANCH_OR_TAG:-master}"
-export URANIUM_BRANCH_OR_TAG="${URANIUM_BRANCH_OR_TAG:-master}"
-export CURAENGINE_BRANCH_OR_TAG="${CURAENGINE_BRANCH_OR_TAG:-master}"
-export CURABINARYDATA_BRANCH_OR_TAG="${CURABINARYDATA_BRANCH_OR_TAG:-master}"
-export FDMMATERIALS_DATA_BRANCH_OR_TAG="${FDMMATERIALS_BRANCH_OR_TAG:-master}"
-export LIBCHARON_BRANCH_OR_TAG="${LIBCHARON_BRANCH_OR_TAG:-master}"
-
 export CURA_VERSION_MAJOR="${CURA_VERSION_MAJOR:-0}"
 export CURA_VERSION_MINOR="${CURA_VERSION_MINOR:-0}"
 export CURA_VERSION_PATCH="${CURA_VERSION_PATCH:-0}"
 export CURA_VERSION_EXTRA="${CURA_VERSION_EXTRA:-}"
-
-export CURA_BUILD_TYPE="${CURA_BUILD_TYPE}"
-export CURA_NO_INSTALL_PLUGINS="${CURA_NO_INSTALL_PLUGINS}"
+export CURA_BUILD_NAME="${CURA_BUILD_NAME:-master}"
 
 export CURA_CLOUD_API_ROOT="${CURA_CLOUD_API_ROOT:-https://api.ultimaker.com}"
 export CURA_CLOUD_API_VERSION="${CURA_CLOUD_API_VERSION:-1}"
 export CURA_CLOUD_ACCOUNT_API_ROOT="${CURA_CLOUD_ACCOUNT_API_ROOT:-https://account.ultimaker.com}"
-
-export CURA_ENABLE_DEBUG_MODE="${CURA_ENABLE_DEBUG_MODE:-ON}"
-export CURA_ENABLE_CURAENGINE_EXTRA_OPTIMIZATION_FLAGS="${CURA_ENABLE_CURAENGINE_EXTRA_OPTIMIZATION_FLAGS:-ON}"
 
 # Set up development environment variables
 #source /opt/rh/devtoolset-7/enable
@@ -53,11 +47,8 @@ export CMAKE_INSTALL_PREFIX=${CURA_BUILD_ENV_PATH}
 #export LD_LIBRARY_PATH=${CMAKE_INSTALL_PREFIX}/lib/
 export PYTHONPATH=${CMAKE_INSTALL_PREFIX}/lib/python3/dist-packages/:${CMAKE_INSTALL_PREFIX}/lib/python3.5:${CMAKE_INSTALL_PREFIX}/lib/python3.5/site-packages/
 
-#if [ -d "${ROOT_DIR}/build" ]; then
-#  rm -rf "${ROOT_DIR}/build"
-#fi
-mkdir -p "${ROOT_DIR}/build"
-cd "${ROOT_DIR}/build"
+mkdir -p ${ROOT_DIR}/build
+cd ${ROOT_DIR}/build
 
 #echo ${PYTHONPATH}
 #/bin/bash
@@ -65,20 +56,22 @@ cd "${ROOT_DIR}/build"
 # Create AppImage
 cmake "${ROOT_DIR}" \
     -DCMAKE_PREFIX_PATH="${CURA_BUILD_ENV_PATH}" \
+    \
+    -DPYTHON3_PACKAGES_PATH="${CMAKE_INSTALL_PREFIX}/lib/python3/site-packages" \
+    -DPYTHON3_LIBRARY="${CMAKE_INSTALL_PREFIX}/lib/libpython3.so" \
+    -DPYTHON_INCLUDE_DIR="${CMAKE_INSTALL_PREFIX}/include/python3.5" \
+    -DPYTHON3_EXECUTABLE="${CMAKE_INSTALL_PREFIX}/bin/python3" \
+    \
     -DCURA_VERSION_MAJOR="${CURA_VERSION_MAJOR}" \
     -DCURA_VERSION_MINOR="${CURA_VERSION_MINOR}" \
     -DCURA_VERSION_PATCH="${CURA_VERSION_PATCH}" \
     -DCURA_VERSION_EXTRA="${CURA_VERSION_EXTRA}" \
-    -DCURA_BUILDTYPE="${CURA_BUILD_TYPE}" \
-    -DCURA_NO_INSTALL_PLUGINS="${CURA_NO_INSTALL_PLUGINS}" \
+    -DCURA_BUILD_NAME="${CURA_BUILD_NAME}" \
     -DCURA_CLOUD_API_ROOT="${CURA_CLOUD_API_ROOT}" \
     -DCURA_CLOUD_API_VERSION="${CURA_CLOUD_API_VERSION}" \
     -DCURA_CLOUD_ACCOUNT_API_ROOT="${CURA_CLOUD_ACCOUNT_API_ROOT}" \
     -DSIGN_PACKAGE=OFF
 make
-make package
-
-chown -R 1000:1000 "${ROOT_DIR}/build"
 
 # Copy the appimage to the output directory
 chmod a+x Cura-*.AppImage
